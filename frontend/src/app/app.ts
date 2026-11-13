@@ -11,9 +11,9 @@ import {
 import { RouterOutlet } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { remixArrowLeftUpLongLine } from '@ng-icons/remixicon';
-import { lucideMoon, lucideRotateCcw, lucideSun, lucidePlus } from '@ng-icons/lucide';
+import { lucideMoon, lucideRotateCcw, lucideSearch, lucideSun, lucidePlus } from '@ng-icons/lucide';
 import { ThemeService } from './services/theme';
-import { HttpService, RagResponse } from './services/http-service';
+import { HttpService, RagResponse, SearchResponse } from './services/http-service';
 import { phosphorPencilSimpleBold } from '@ng-icons/phosphor-icons/bold';
 import { phosphorCopyBold } from '@ng-icons/phosphor-icons/bold';
 import { remixWindow2Line, remixDeleteBinLine } from '@ng-icons/remixicon';
@@ -87,6 +87,7 @@ const writeChats = (chats: Chat[]): void => {
       phosphorCopyBold,
       remixWindow2Line,
       lucidePlus,
+      lucideSearch,
       remixDeleteBinLine,
       matDocsOutline,
     }),
@@ -102,6 +103,9 @@ export class App {
   chatId = sessionStorage.getItem('chatId') ?? crypto.randomUUID();
   messages = signal<QA[]>(this.chats().find((c) => c.id === this.chatId)?.messages ?? []);
   historyOpen = signal(false);
+  searchOpen = signal(false);
+  searchResult = signal<SearchResponse | null>(null);
+  searchError = signal('');
   loading = signal(false);
   chat = viewChild<ElementRef<HTMLElement>>('chat');
 
@@ -218,6 +222,10 @@ export class App {
   }
 
   async submit(): Promise<void> {
+    if (this.searchOpen()) {
+      await this.runSearch();
+      return;
+    }
     const question = this.text.trim();
     this.text = '';
     const file = this.file();
@@ -236,6 +244,22 @@ export class App {
 
   private patch(i: number, p: Partial<QA>): void {
     this.messages.update((m) => m.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  }
+
+  private async runSearch(): Promise<void> {
+    const question = this.text.trim();
+    if (!question || this.loading()) return;
+    this.text = '';
+    this.loading.set(true);
+    this.searchError.set('');
+    try {
+      this.searchResult.set(await this.http.search(question));
+    } catch (e) {
+      this.searchResult.set(null);
+      this.searchError.set(e instanceof Error ? e.message : 'Something went wrong.');
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   private async run(i: number): Promise<void> {

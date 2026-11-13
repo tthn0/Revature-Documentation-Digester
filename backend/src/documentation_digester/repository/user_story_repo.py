@@ -1,5 +1,6 @@
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+from psycopg.errors import UndefinedTable
 from sqlalchemy import select
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
@@ -15,9 +16,13 @@ class UserStoryRepo:
     def has_stories(self) -> bool:
         try:
             return self.db.scalars(select(UserStory).limit(1)).first() is not None
-        except ProgrammingError:
+        except ProgrammingError as error:
             self.db.rollback()
-            return False
+            # A missing table means stories have not been loaded yet.
+            # A table with the wrong columns is a real error.
+            if isinstance(error.orig, UndefinedTable):
+                return False
+            raise
             
     
     def search(self, question: str, limit: int) -> list[UserStoryHit]:

@@ -2,12 +2,56 @@ import os
 import shutil
 import tempfile
 import uuid
+import zipfile
 from typing import Any, Protocol, TypedDict
+from xml.etree import ElementTree
 
 from fastapi import UploadFile
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_core.documents import Document
+
+# Private-use characters from the printed Godot docs PDF, whose font
+# maps ordinary letters and punctuation onto this range.
+_PDF_TEXT_REPAIR = str.maketrans(
+    {
+        "\ue050": "l",
+        "\ue072": "A",
+        "\ue073": "2",
+        "\ue074": "3",
+        "\ue075": "4",
+        "\ue078": "x",
+        "\ue093": ",",
+        "\ue094": ".",
+        "\ue095": ":",
+        "\ue096": ",",
+        "\ue00c": "I",
+        "\uee48": "(",
+        "\uee49": ")",
+        "\uee54": "-",
+        "\uee57": ">",
+        "\uf015": None,
+        "\uf06a": "\n",
+        "\uf0a8": None,
+        "\uf0a9": None,
+    }
+)
+_WORD_XML = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def _repair_pdf_text(text: str) -> str:
+    return text.translate(_PDF_TEXT_REPAIR)
+
+
+def _docx_text(path: str) -> str:
+    with zipfile.ZipFile(path) as archive:
+        root = ElementTree.fromstring(archive.read("word/document.xml"))
+    paragraphs: list[str] = []
+    for paragraph in root.iter(f"{_WORD_XML}p"):
+        line = "".join(node.text or "" for node in paragraph.iter(f"{_WORD_XML}t")).strip()
+        if line:
+            paragraphs.append(line)
+    return "\n".join(paragraphs)
 
 from documentation_digester.config.settings import settings
 
@@ -84,15 +128,17 @@ class DocumentService:
 
             match extension:
                 case ".txt" | ".rst" | ".md":
-                    loader = TextLoader(temp_path, encoding="utf-8")
+                    document = TextLoader(temp_path, encoding="utf-8").load()
                 case ".pdf":
-                    loader = PyPDFLoader(temp_path)
+                    document = PyPDFLoader(temp_path).load()
+                    for page in document:
+                        page.page_content = _repair_pdf_text(page.page_content)
+                case ".docx":
+                    document = [Document(page_content=_docx_text(temp_path))]
                 case _:
                     raise DocumentValidationError(
                         f"File must be one of {settings.SUPPORTED_EXTENSIONS}"
                     )
-
-            document = loader.load()
             chunks = self.chunker.split_documents(document)
 
             if not chunks:

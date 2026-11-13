@@ -57,13 +57,11 @@ Copy-Item .env.example .env
 ```env
 DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/documentation_digester
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen2.5:1.5b
+OLLAMA_LLM_MODEL=qwen2.5:1.5b
 OLLAMA_EMBEDDING_MODEL=nomic-embed-text:latest
 ```
 
-That URL matches the Docker database. If your local Postgres user has a different password, put it after `postgres:`. If it has no password, use `postgresql+psycopg://postgres@localhost:5432/documentation_digester`.
-
-The chat model setting the code reads is `OLLAMA_MODEL`. `.env.example` lists `OLLAMA_LLM_MODEL`, and that name is ignored. Leave the line out to keep the default `qwen2.5:1.5b`.
+That URL matches the Docker database. If your local Postgres user has a different password, put it after `postgres:`. If it has no password, use `postgresql+psycopg://postgres@localhost:5432/documentation_digester`. Leave `OLLAMA_LLM_MODEL` out to keep the default `qwen2.5:1.5b`.
 
 ## 4. Start the backend
 
@@ -96,7 +94,7 @@ Type a question and press Send. A question such as “How do I use signals to co
 
 ## 6. Load the sample Godot docs
 
-Supported uploads are `.txt`, `.rst`, `.md`, and `.pdf`. `.docx` is rejected.
+Supported uploads are `.txt`, `.rst`, `.md`, `.pdf`, and `.docx`.
 
 From the chat page, use **Upload text file** and pick files in `data/samples/`:
 

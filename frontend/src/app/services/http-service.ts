@@ -12,6 +12,17 @@ export interface RagResponse {
   sources: Source[];
 }
 
+export interface UserStoryHit {
+  user_story_id: string;
+  title: string;
+  text: string;
+}
+
+export interface SearchResponse {
+  documents: Source[];
+  user_stories: UserStoryHit[];
+}
+
 // ponytail: hardcoded backend URL, move to environment config when deploying
 const BASE = 'http://localhost:8000/documents';
 
@@ -33,6 +44,14 @@ export type StreamEvent =
 
 @Service()
 export class HttpService {
+  /** Document chunks and user stories for one question. */
+  search(question: string, k = 5): Promise<SearchResponse> {
+    return send('/search', {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, k }),
+    });
+  }
+
   /** Resolves once the backend has embedded the document. */
   upload(file: File): Promise<unknown> {
     const body = new FormData();

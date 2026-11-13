@@ -1,6 +1,6 @@
 <main
   class="relative transition-[padding] duration-300 flex flex-col h-screen items-center gap-6 px-4 py-17 bg-(--bg) text-(--text)"
-  [class.justify-center]="!messages().length"
+  [class.justify-center]="!messages().length && !searchOpen()"
   [style.padding-left.rem]="historyOpen() ? 17 : null"
 >
   <div
@@ -11,6 +11,14 @@
     </button>
     <button title="New Chat" class="cursor-pointer" (click)="newChat()">
       <ng-icon name="lucidePlus" />
+    </button>
+    <button
+      title="Search"
+      aria-label="Search"
+      class="cursor-pointer"
+      (click)="searchOpen.set(!searchOpen())"
+    >
+      <ng-icon name="lucideSearch" />
     </button>
   </div>
   <aside
@@ -42,12 +50,49 @@
   </aside>
   <div
     class="flex flex-col gap-6 w-full max-w-2xl min-h-0"
-    [class.flex-1]="messages().length"
+    [class.flex-1]="messages().length || searchOpen()"
     [class]="messages().length ? 'bg-(--surface)' : ''"
     [class.rounded-3xl]="messages().length"
     [class.p-4]="messages().length"
   >
-    @if (messages().length) {
+    @if (searchOpen()) {
+      <section class="flex-1 w-full max-w-2xl overflow-y-auto space-y-6">
+        @if (searchError()) {
+          <p role="alert" class="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-red-600 dark:text-red-400">
+            {{ searchError() }}
+          </p>
+        } @else if (searchResult(); as result) {
+          <div class="space-y-3">
+            <h2 class="text-lg font-semibold">Documentation</h2>
+            @for (doc of result.documents; track $index) {
+              <article class="rounded-2xl border border-(--text)/15 bg-(--bg) px-4 py-3 space-y-1">
+                <p class="text-sm font-semibold">
+                  {{ doc.filename }} - chunk {{ doc.chunk_index }}{{ doc.page === 'N/A' ? '' : ' - Page ' + doc.page }}
+                </p>
+                <p class="whitespace-pre-wrap text-(--text)/80">{{ doc.content }}</p>
+              </article>
+            } @empty {
+              <p class="text-(--text)/50">No documentation hits.</p>
+            }
+          </div>
+          <div class="space-y-3">
+            <h2 class="text-lg font-semibold">User stories</h2>
+            @for (story of result.user_stories; track story.user_story_id) {
+              <article class="rounded-2xl border border-(--text)/15 bg-(--bg) px-4 py-3 space-y-1">
+                <p class="font-semibold">{{ story.title }}</p>
+                <p class="whitespace-pre-wrap text-(--text)/80">{{ story.text }}</p>
+              </article>
+            } @empty {
+              <p class="text-(--text)/50">No user stories.</p>
+            }
+          </div>
+        } @else if (loading()) {
+          <p class="text-center text-(--text)/70">Searching...</p>
+        } @else {
+          <h1 class="text-3xl sm:text-4xl font-serif text-center">Search docs and stories</h1>
+        }
+      </section>
+    } @else if (messages().length) {
       <section #chat class="flex-1 w-full max-w-2xl overflow-y-auto pt-6 space-y-6 scrollbar-none">
         @for (m of messages(); track $index; let mi = $index) {
           <div class="group ml-auto w-fit max-w-[85%]">
@@ -144,7 +189,7 @@
       <textarea
         #box
         rows="3"
-        placeholder="How can I help you today?"
+        [placeholder]="searchOpen() ? 'Search the docs and user stories' : 'How can I help you today?'"
         (input)="onInput($event)"
         (keydown.enter)="onEnter($event, box)"
         class="block w-full field-sizing-content overflow-y-auto scrollbar-none [&::-webkit-scrollbar]:hidden resize-none bg-transparent pt-4 pb-14 mb-15 px-5 min-h-32 max-h-80 placeholder:text-(--text)/50 border-0 focus:outline-none focus:ring-0"
@@ -152,7 +197,7 @@
       <input
         #picker
         type="file"
-        accept=".txt,text/plain,.pdf,application/pdf,.md,.markdown,text/markdown,.rst"
+        accept=".txt,text/plain,.pdf,application/pdf,.md,.markdown,text/markdown,.rst,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         hidden
         (change)="pick(picker)"
       />
